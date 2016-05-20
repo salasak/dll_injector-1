@@ -27,12 +27,13 @@ bool Injector::Inject(DWORD processID, const char* dllPath)
 
 bool Injector::_inject(const char* processName, const char* dllPath, DWORD processID)
 {
-	// If procID is 0, the caller is passing procName as primary argument
+	// If processID is 0, the caller is passing processName as primary argument
 	// and we need to find the processID via processName instead.
 	if (processID == 0)
 		processID = _getProcessID(processName);
 
-	// if procID is still 0, processID couldn't be found.
+	// if processID is still 0, processID couldn't be found.
+	// Terminate program.
 	if (processID == 0)
 		return false;
 
@@ -66,11 +67,11 @@ bool Injector::_inject(const char* processName, const char* dllPath, DWORD proce
 DWORD Injector::_getProcessID(const char* processName)
 {
 	PROCESSENTRY32 processEntry;
-	HANDLE thSnapShot;
-	BOOL queNotEmpty = false;
+	HANDLE hProcSnapShot;
+	BOOL isNotEmpty = false;
 
-	thSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	if (thSnapShot == INVALID_HANDLE_VALUE)
+	hProcSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hProcSnapShot == INVALID_HANDLE_VALUE)
 	{
 		printf("\n\n>Error: Unable to create toolhelp snapshot!");
 		return false;
@@ -78,14 +79,14 @@ DWORD Injector::_getProcessID(const char* processName)
 
 	processEntry.dwSize = sizeof(PROCESSENTRY32);
 
-	queNotEmpty = Process32First(thSnapShot, &processEntry);
+	isNotEmpty = Process32First(hProcSnapShot, &processEntry);
 
-	while (queNotEmpty)
+	while (isNotEmpty)
 	{
+		// Converting WCHAR to char*. Not needed if compiling with GCC.
+		// If compiling with GCC, use processEntry.szExeFile directly
+		// in strcmp instead.
 		char ANSIszExeFile[MAX_PATH] = { 0 };
-		
-		// Converting WCHAR to char*. This is not needed if compiling with GCC.
-		// Use processEntry.szExeFile directly in strcmp instead.
 		WideCharToMultiByte(CP_ACP, 
 			WC_COMPOSITECHECK, 
 			processEntry.szExeFile, 
@@ -99,7 +100,7 @@ DWORD Injector::_getProcessID(const char* processName)
 		{
 			return processEntry.th32ProcessID;
 		}
-		queNotEmpty = Process32Next(thSnapShot, &processEntry);
+		isNotEmpty = Process32Next(hProcSnapShot, &processEntry);
 	}
 	return 0;
 }
