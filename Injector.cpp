@@ -7,56 +7,65 @@
 #include <tlhelp32.h>
 #include <cstdio>
 
-bool Injector::_inject(char* procName, char* dllPath, DWORD procID = 0)
+Injector::Injector()
+{
+}
+
+Injector::~Injector()
+{
+}
+
+bool Injector::Inject(const char* processName, const char* dllPath)
+{
+	return _inject(processName, dllPath);
+}
+
+bool Injector::Inject(DWORD processID, const char* dllPath)
+{
+	return _inject("", dllPath, processID);
+}
+
+bool Injector::_inject(const char* processName, const char* dllPath, DWORD processID)
 {
 	// If procID is 0, the caller is passing procName as primary argument
-	// and we need to find the procID via procName instead.
-	if (procID == 0)
-		procID = GetTargetThreadIDFromProcName(procName);
+	// and we need to find the processID via processName instead.
+	if (processID == 0)
+		processID = _getProcessID(processName);
 
-	// if procID is still 0, procID couldn't be found.
-	if (procID == 0)
+	// if procID is still 0, processID couldn't be found.
+	if (processID == 0)
 		return false;
 
-	HANDLE Proc = 0;
-	LPVOID RemoteString, LoadLibAddy;
+	HANDLE hProcess = 0;
+	LPVOID remoteString, fpLoadLibraryA;
 
-	Proc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
-	if (!Proc)
+	hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processID);
+	if (!hProcess)
 	{
 		printf("\n\n>OpenProcess() failed: %d", GetLastError());
 		return false;
 	}
 
-	LoadLibAddy = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
+	fpLoadLibraryA = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
 
 	// Allocate space in the process for our DLL 
-	RemoteString = (LPVOID)VirtualAllocEx(Proc, NULL, strlen(dllPath), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	remoteString = (LPVOID)VirtualAllocEx(hProcess, NULL, strlen(dllPath), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 	// Write the string name of our DLL in the memory allocated 
-	WriteProcessMemory(Proc, (LPVOID)RemoteString, dllPath, strlen(dllPath), NULL);
+	WriteProcessMemory(hProcess, (LPVOID)remoteString, dllPath, strlen(dllPath), NULL);
 
 	// Load our DLL 
-	CreateRemoteThread(Proc, NULL, NULL, (LPTHREAD_START_ROUTINE)LoadLibAddy, (LPVOID)RemoteString, NULL, NULL);
+	CreateRemoteThread(hProcess, NULL, NULL, (LPTHREAD_START_ROUTINE)fpLoadLibraryA, (LPVOID)remoteString, NULL, NULL);
 
-	CloseHandle(Proc);
+	// Let the program regain control of itself
+	CloseHandle(hProcess);
 
 	return true;
 }
 
-bool Injector::Inject(char* procName, char* dllPath)
+DWORD Injector::_getProcessID(const char* processName)
 {
-	return _inject(procName, dllPath);
-}
-
-bool Injector::Inject(DWORD pID, char* dllPath)
-{
-	return _inject("", dllPath, pID);
-}
-
-DWORD Injector::GetTargetThreadIDFromProcName(const char * procName)
-{
-	PROCESSENTRY32 procEntry;
+	PROCESSENTRY32 processEntry;
 	HANDLE thSnapShot;
 	BOOL queNotEmpty = false;
 
@@ -67,38 +76,30 @@ DWORD Injector::GetTargetThreadIDFromProcName(const char * procName)
 		return false;
 	}
 
-	procEntry.dwSize = sizeof(PROCESSENTRY32);
+	processEntry.dwSize = sizeof(PROCESSENTRY32);
 
-	queNotEmpty = Process32First(thSnapShot, &procEntry);
+	queNotEmpty = Process32First(thSnapShot, &processEntry);
 
 	while (queNotEmpty)
 	{
 		char ANSIszExeFile[MAX_PATH] = { 0 };
-
-		// PROCESSENTRY32's string members are WCHAR.
-		// Converts WCHAR to char* (required for using strcmp)
+		
+		// Converting WCHAR to char*. This is not needed if compiling with GCC.
+		// Use processEntry.szExeFile directly in strcmp instead.
 		WideCharToMultiByte(CP_ACP, 
 			WC_COMPOSITECHECK, 
-			procEntry.szExeFile, 
+			processEntry.szExeFile, 
 			-1, 
-			ANSIszExeFile,
-			sizeof(ANSIszExeFile),
+			ANSIszExeFile, 
+			sizeof(ANSIszExeFile), 
 			NULL, 
 			NULL);
 
-		if (!strcmp(ANSIszExeFile, procName))
+		if (!strcmp(ANSIszExeFile, processName))
 		{
-			return procEntry.th32ProcessID;
+			return processEntry.th32ProcessID;
 		}
-		queNotEmpty = Process32Next(thSnapShot, &procEntry);
+		queNotEmpty = Process32Next(thSnapShot, &processEntry);
 	}
 	return 0;
-}
-
-Injector::Injector(void)
-{
-}
-
-Injector::~Injector(void)
-{
 }

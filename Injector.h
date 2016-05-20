@@ -2,20 +2,23 @@
 // I made some changes to it, but I don't claim authorship.
 //
 
-#pragma once
+#ifndef _INJECTOR_H
+#define _INJECTOR_H
+
 #include <Windows.h>
 
 class Injector
 {
 public:
-	Injector(void);
-	~Injector(void);
+	Injector();
+	~Injector();
 
-	bool Inject(char* procName, char* dllPath);
-	bool Inject(DWORD pID, char* dllPath);
+	bool Inject(const char* processName, const char* dllPath);
+	bool Inject(DWORD processID, const char* dllPath);
 
 private:
-	bool _inject(char* procName, char* dllPath, DWORD pID);
-	DWORD GetTargetThreadIDFromProcName(const char* ProcName);
+	bool _inject(const char* processName, const char* dllPath, DWORD processID = 0);
+	DWORD _getProcessID(const char* processName);
 };
 
+#endif

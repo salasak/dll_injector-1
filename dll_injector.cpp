@@ -22,9 +22,9 @@ int main(int argc, char** argv)
 
 	GetCurrentDirectoryA(MAX_PATH, currentDir);
 	
-	strcpy(dllDir, currentDir);
-	strcat(dllDir, "\\");
-	strcat(dllDir, argv[2]);
+	strcpy_s(dllDir, currentDir);
+	strcat_s(dllDir, "\\");
+	strcat_s(dllDir, argv[2]);
 	
 	// Handling path navigation commands, like ../../dir
 	GetFullPathNameA(dllDir, MAX_PATH, dllRealPath, NULL);
