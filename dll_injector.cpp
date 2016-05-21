@@ -10,7 +10,7 @@ int main(int argc, char** argv)
 {
 	if (argc != 3) 
 	{
-		printf("*** dll_injector ***\n\nUsage: binary_name target_process_name dll_relative_path\n\n");
+		printf("======= DLL Injector =======\n\nUsage: binary_name target_process_name dll_relative_path\n\n");
 		system("PAUSE");
 		return 1;
 	}
@@ -26,7 +26,7 @@ int main(int argc, char** argv)
 	strcat_s(dllDir, "\\");
 	strcat_s(dllDir, argv[2]);
 	
-	// Handling path navigation commands, like ../../dir
+	// Handling directory navigation commands, like ../../dir
 	GetFullPathNameA(dllDir, MAX_PATH, dllRealPath, NULL);
 
 	printf("\n>Current directory: \t%s\n", currentDir);
@@ -43,4 +43,3 @@ int main(int argc, char** argv)
 
 	return 0;
 }
-

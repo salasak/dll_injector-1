@@ -58,7 +58,7 @@ bool Injector::_inject(const char* processName, const char* dllPath, DWORD proce
 	// Load our DLL 
 	CreateRemoteThread(hProcess, NULL, NULL, (LPTHREAD_START_ROUTINE)fpLoadLibraryA, (LPVOID)remoteString, NULL, NULL);
 
-	// Let the program regain control of itself
+	// Let the program regain control of itself 
 	CloseHandle(hProcess);
 
 	return true;
@@ -86,17 +86,17 @@ DWORD Injector::_getProcessID(const char* processName)
 		// Converting WCHAR to char*. Not needed if compiling with GCC.
 		// If compiling with GCC, use processEntry.szExeFile directly
 		// in strcmp instead.
-		char ANSIszExeFile[MAX_PATH] = { 0 };
+		char szExeFileANSI[MAX_PATH] = { 0 };
 		WideCharToMultiByte(CP_ACP, 
 			WC_COMPOSITECHECK, 
 			processEntry.szExeFile, 
 			-1, 
-			ANSIszExeFile, 
-			sizeof(ANSIszExeFile), 
+			szExeFileANSI, 
+			sizeof(szExeFileANSI), 
 			NULL, 
 			NULL);
 
-		if (!strcmp(ANSIszExeFile, processName))
+		if (!strcmp(szExeFileANSI, processName))
 		{
 			return processEntry.th32ProcessID;
 		}
