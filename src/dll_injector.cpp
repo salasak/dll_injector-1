@@ -39,7 +39,7 @@ int main(int argc, char** argv)
 	{
 		printf("\n>DLL injection SUCCEEDED!\n");
 	}
-	else 
+	else
 	{
 		printf("\n>DLL injection FAILED...");
 		switch (status)

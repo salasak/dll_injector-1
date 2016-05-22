@@ -1,7 +1,7 @@
 #ifndef _STATUSCODE_H
 #define _STATUSCODE_H
 
-enum StatusCode 
+enum StatusCode
 {
 	OK = 0,
 	CANT_FIND_PROC_ID,

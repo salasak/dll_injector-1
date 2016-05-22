@@ -42,13 +42,13 @@ StatusCode Injector::_inject(const char* procName, const char* dllPath, DWORD pr
 
 	HANDLE procHandle = 0;
 	LPVOID remoteString;
-	LPVOID fnLoadLibraryA;
+	LPVOID loadLibraryA;
 
 	procHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
 	if (!procHandle)
 		return StatusCode::CANT_OPEN_PROCESS;
 
-	fnLoadLibraryA = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
+	loadLibraryA = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
 
 	// Allocate memory in the remote process for our string argument 
 	remoteString = VirtualAllocEx(procHandle, NULL, strlen(dllPath), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
@@ -57,7 +57,7 @@ StatusCode Injector::_inject(const char* procName, const char* dllPath, DWORD pr
 	WriteProcessMemory(procHandle, remoteString, dllPath, strlen(dllPath), NULL);
 
 	// Call LoadLibrary remotely and pass our string (DLL path) as argument to it.
-	CreateRemoteThread(procHandle, NULL, 0, (LPTHREAD_START_ROUTINE)fnLoadLibraryA, remoteString, 0, NULL);
+	CreateRemoteThread(procHandle, NULL, 0, (LPTHREAD_START_ROUTINE)loadLibraryA, remoteString, 0, NULL);
 
 	// Let the program regain control of itself 
 	CloseHandle(procHandle);
@@ -70,53 +70,39 @@ DWORD Injector::_getProcID(const char* procName, StatusCode* status)
 	*status = StatusCode::OK;
 
 	PROCESSENTRY32 procEntry;
-	HANDLE hProcSnapShot;
+	HANDLE procSnapShot;
 	BOOL isNotEmpty = false;
 
-	hProcSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	if (hProcSnapShot == INVALID_HANDLE_VALUE)
+	procSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (procSnapShot == INVALID_HANDLE_VALUE)
 	{
 		*status = StatusCode::CANT_CREATE_PROC_SNAPSHOT;
 		return 0;
 	}
 
 	procEntry.dwSize = sizeof(PROCESSENTRY32);
-
-	isNotEmpty = Process32First(hProcSnapShot, &procEntry);
+	isNotEmpty = Process32First(procSnapShot, &procEntry);
 
 	while (isNotEmpty)
 	{
-
 #ifdef _MSC_VER
-
 		// Converts WCHAR to char*. Only needed if building in Unicode, apparently
-		char szExeFileANSI[MAX_PATH] = { 0 };
-		WideCharToMultiByte(CP_ACP,
-			WC_COMPOSITECHECK,
-			procEntry.szExeFile,
-			-1,
-			szExeFileANSI,
-			sizeof(szExeFileANSI),
-			NULL,
-			NULL);
+		char exeFileANSI[MAX_PATH] = { 0 };
+		WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, procEntry.szExeFile, -1,
+			exeFileANSI, sizeof(exeFileANSI), NULL, NULL);
 
 		// If we find the process we are looking for, return its ID
-		if (!strcmp(szExeFileANSI, procName))
+		if (!strcmp(exeFileANSI, procName))
 			return procEntry.th32ProcessID;
-
 #else
-
 		// If we find the process we are looking for, return its ID
 		if (!strcmp(procEntry.szExeFile, procName))
 			return procEntry.th32ProcessID;
-
 #endif
-
 		// Else, search next process
-		isNotEmpty = Process32Next(hProcSnapShot, &procEntry);
+		isNotEmpty = Process32Next(procSnapShot, &procEntry);
 	}
 
 	*status = StatusCode::CANT_FIND_PROC_ID;
-
 	return 0;
 }
