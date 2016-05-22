@@ -42,7 +42,6 @@ int main(int argc, char** argv)
 	else 
 	{
 		printf("\n>DLL injection FAILED...");
-
 		switch (status)
 		{
 		case StatusCode::CANT_FIND_PROC_ID:
@@ -58,8 +57,7 @@ int main(int argc, char** argv)
 			printf("\n>Invalid DLL path!");
 			break;
 		}
-
-		printf("\n>Error code: %d\n", GetLastError());
+		printf("\n>Error code: %d\n", (int)GetLastError());
 	}
 
 	return 0;

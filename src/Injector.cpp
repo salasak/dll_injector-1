@@ -51,13 +51,13 @@ StatusCode Injector::_inject(const char* procName, const char* dllPath, DWORD pr
 	fnLoadLibraryA = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
 
 	// Allocate memory in the remote process for our string argument 
-	remoteString = (LPVOID)VirtualAllocEx(procHandle, NULL, strlen(dllPath), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	remoteString = VirtualAllocEx(procHandle, NULL, strlen(dllPath), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 	// Write the string in the allocated memory 
-	WriteProcessMemory(procHandle, (LPVOID)remoteString, dllPath, strlen(dllPath), NULL);
+	WriteProcessMemory(procHandle, remoteString, dllPath, strlen(dllPath), NULL);
 
 	// Call LoadLibrary remotely and pass our string (DLL path) as argument to it.
-	CreateRemoteThread(procHandle, NULL, NULL, (LPTHREAD_START_ROUTINE)fnLoadLibraryA, (LPVOID)remoteString, NULL, NULL);
+	CreateRemoteThread(procHandle, NULL, 0, (LPTHREAD_START_ROUTINE)fnLoadLibraryA, remoteString, 0, NULL);
 
 	// Let the program regain control of itself 
 	CloseHandle(procHandle);
