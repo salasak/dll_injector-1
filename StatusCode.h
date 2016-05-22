@@ -1,0 +1,13 @@
+#ifndef _STATUSCODE_H
+#define _STATUSCODE_H
+
+enum StatusCode 
+{
+	OK = 0,
+	CANT_FIND_PROC_ID,
+	CANT_OPEN_PROCESS,
+	CANT_CREATE_PROC_SNAPSHOT,
+	INVALID_DLL_PATH
+};
+
+#endif

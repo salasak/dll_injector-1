@@ -1,11 +1,10 @@
 // Most of this code was available on internet forums. 
 // I made some changes to it, but I don't claim authorship.
-//
 
 #include "Injector.h"
 #include <Windows.h>
 #include <tlhelp32.h>
-#include <cstdio>
+#include <io.h> // only for using _access()
 
 Injector::Injector()
 {
@@ -15,57 +14,61 @@ Injector::~Injector()
 {
 }
 
-bool Injector::Inject(const char* processName, const char* dllPath)
+StatusCode Injector::Inject(const char* procName, const char* dllPath)
 {
-	return _inject(processName, dllPath);
+	return _inject(procName, dllPath);
 }
 
-bool Injector::Inject(DWORD processID, const char* dllPath)
+StatusCode Injector::Inject(DWORD procID, const char* dllPath)
 {
-	return _inject("", dllPath, processID);
+	return _inject("", dllPath, procID);
 }
 
-bool Injector::_inject(const char* processName, const char* dllPath, DWORD processID)
+StatusCode Injector::_inject(const char* procName, const char* dllPath, DWORD procID)
 {
-	// If processID is 0, the caller is passing processName as primary argument
-	// and we need to find the processID via processName instead.
-	if (processID == 0)
-		processID = _getProcessID(processName);
+	// Check if the DLL exists 
+	if (_access(dllPath, 0))
+		return StatusCode::INVALID_DLL_PATH;
 
-	// if processID is still 0, processID couldn't be found.
-	// Terminate program.
-	if (processID == 0)
-		return false;
-
-	HANDLE hProcess = 0;
-	LPVOID remoteString, fpLoadLibraryA;
-
-	hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processID);
-	if (!hProcess)
+	// If procID is 0, we need to find a valid process ID using procName.
+	if (procID == 0) 
 	{
-		printf("\n\n>OpenProcess() failed: %d", GetLastError());
-		return false;
+		StatusCode status;
+		procID = _getProcID(procName, &status);
+
+		if (status != StatusCode::OK)
+			return status;
 	}
+	
+	HANDLE procHandle = 0;
+	LPVOID remoteString;
+	LPVOID fnLoadLibraryA;
 
-	fpLoadLibraryA = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
+	procHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
+	if (!procHandle)
+		return StatusCode::CANT_OPEN_PROCESS;
 
-	// Allocate space in the process for our DLL 
-	remoteString = (LPVOID)VirtualAllocEx(hProcess, NULL, strlen(dllPath), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	fnLoadLibraryA = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
 
-	// Write the string name of our DLL in the memory allocated 
-	WriteProcessMemory(hProcess, (LPVOID)remoteString, dllPath, strlen(dllPath), NULL);
+	// Allocate memory in the remote process for our string argument 
+	remoteString = (LPVOID)VirtualAllocEx(procHandle, NULL, strlen(dllPath), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
-	// Load our DLL 
-	CreateRemoteThread(hProcess, NULL, NULL, (LPTHREAD_START_ROUTINE)fpLoadLibraryA, (LPVOID)remoteString, NULL, NULL);
-
+	// Write the string in the allocated memory 
+	WriteProcessMemory(procHandle, (LPVOID)remoteString, dllPath, strlen(dllPath), NULL);
+	
+	// Call LoadLibrary remotely and pass our string (DLL path) as argument to it.
+	CreateRemoteThread(procHandle, NULL, NULL, (LPTHREAD_START_ROUTINE)fnLoadLibraryA, (LPVOID)remoteString, NULL, NULL);
+	
 	// Let the program regain control of itself 
-	CloseHandle(hProcess);
+	CloseHandle(procHandle);
 
-	return true;
+	return StatusCode::OK;
 }
 
-DWORD Injector::_getProcessID(const char* processName)
+DWORD Injector::_getProcID(const char* procName, StatusCode* status)
 {
+	*status = StatusCode::OK;
+
 	PROCESSENTRY32 processEntry;
 	HANDLE hProcSnapShot;
 	BOOL isNotEmpty = false;
@@ -73,8 +76,8 @@ DWORD Injector::_getProcessID(const char* processName)
 	hProcSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	if (hProcSnapShot == INVALID_HANDLE_VALUE)
 	{
-		printf("\n\n>Error: Unable to create toolhelp snapshot!");
-		return false;
+		*status = StatusCode::CANT_CREATE_PROC_SNAPSHOT;
+		return 0;
 	}
 
 	processEntry.dwSize = sizeof(PROCESSENTRY32);
@@ -83,9 +86,7 @@ DWORD Injector::_getProcessID(const char* processName)
 
 	while (isNotEmpty)
 	{
-		// Converting WCHAR to char*. Not needed if compiling with GCC.
-		// If compiling with GCC, use processEntry.szExeFile directly
-		// in strcmp instead.
+		// Converts WCHAR to char*. Only needed if building in Unicode, apparently
 		char szExeFileANSI[MAX_PATH] = { 0 };
 		WideCharToMultiByte(CP_ACP, 
 			WC_COMPOSITECHECK, 
@@ -96,11 +97,15 @@ DWORD Injector::_getProcessID(const char* processName)
 			NULL, 
 			NULL);
 
-		if (!strcmp(szExeFileANSI, processName))
-		{
+		// If we find the process we are looking for, return its ID
+		if (!strcmp(szExeFileANSI, procName))
 			return processEntry.th32ProcessID;
-		}
+
+		// Else, search next process
 		isNotEmpty = Process32Next(hProcSnapShot, &processEntry);
 	}
+
+	*status = StatusCode::CANT_FIND_PROC_ID;
+
 	return 0;
 }
