@@ -1,4 +1,4 @@
-CC = g++
+CC = clang++
 INCLUDE_PATH=include
 SRC_PATH=src
 OBJ_PATH=_obj

@@ -85,7 +85,11 @@ DWORD Injector::_getProcID(const char* procName, StatusCode* status)
 
 	while (isNotEmpty)
 	{
-#ifdef _MSC_VER
+#if defined(__clang__) || defined(__MINGW32__)
+		// If we find the process we are looking for, return its ID
+		if (!strcmp(procEntry.szExeFile, procName))
+			return procEntry.th32ProcessID;
+#elif defined(_MSC_VER)
 		// Converts WCHAR to char*. Only needed if building in Unicode, apparently
 		char exeFileANSI[MAX_PATH] = { 0 };
 		WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, procEntry.szExeFile, -1,
@@ -93,10 +97,6 @@ DWORD Injector::_getProcID(const char* procName, StatusCode* status)
 
 		// If we find the process we are looking for, return its ID
 		if (!strcmp(exeFileANSI, procName))
-			return procEntry.th32ProcessID;
-#else
-		// If we find the process we are looking for, return its ID
-		if (!strcmp(procEntry.szExeFile, procName))
 			return procEntry.th32ProcessID;
 #endif
 		// Else, search next process
